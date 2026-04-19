@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from ..database import get_db
 from ..models.schema import PlatformConnection, Creator, User
-from ..security import encrypt_token, decrypt_token
+from ..security import encrypt_token
 from ..services.youtube_service import sync_youtube_data
 
 # Tell oauthlib to not crash if Google changes our requested scopes

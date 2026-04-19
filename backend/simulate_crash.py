@@ -9,7 +9,6 @@ Run with: python simulate_crash.py
 import asyncio
 import random
 import uuid
-import math
 from datetime import datetime, timedelta
 from sqlalchemy import select
 
@@ -85,7 +84,7 @@ async def run_scenario(label: str, views_per_day: list, db):
     baseline_res = await db.execute(baseline_stmt)
     baseline = baseline_res.scalar_one_or_none()
 
-    print(f"\n  BASELINE COMPUTED:")
+    print("\n  BASELINE COMPUTED:")
     if baseline:
         print(f"    EMA-30 (expected daily views): {baseline.ema_30:,.0f}")
         print(f"    StdDev-30 (typical bounce):   ±{baseline.stddev_30:,.0f}")

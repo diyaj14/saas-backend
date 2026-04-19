@@ -23,12 +23,11 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-import sys
-from pathlib import Path
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[1])) 
 
-from app.models.base import Base
-import app.models.schema # Importing the tables so Alembic detects them!
+from app.models.base import Base  # noqa: E402
 
 target_metadata = Base.metadata
 

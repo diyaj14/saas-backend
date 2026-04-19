@@ -1,7 +1,7 @@
 # backend/app/models/schema.py
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, JSON, ForeignKey, Column
+from sqlalchemy import String, Integer, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
