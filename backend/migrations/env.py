@@ -28,6 +28,7 @@ from pathlib import Path  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[1])) 
 
 from app.models.base import Base  # noqa: E402
+import app.models.schema  # noqa: E402, F401
 
 target_metadata = Base.metadata
 
