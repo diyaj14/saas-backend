@@ -1,0 +1,209 @@
+Got it—you both can code, so let’s split by **concerns**, not “biz vs tech”. Think of it as two co‑founder engineers working in parallel.
+
+I’ll call you **Dev A** and your friend **Dev B**; swap if you want.
+
+***
+
+## Phase 0 – Foundations (Week 0–1)
+
+### Dev A
+- Decide final stack (Python/FastAPI or Node/Nest + Next.js + Postgres).  --fastapi,postgresql-supabase
+- Set up monorepo / workspace, linting, formatter, basic CI.  
+- Draft DB schema v0: `users`, `creators`, `platform_connections`, `posts`, `daily_metrics`, `alerts`.
+
+### Dev B
+- Clean up PRD + requirements into `/docs`.  
+- Create low‑fidelity wireframes for:
+  - Onboarding (connect platforms)  
+  - Dashboard (risk gauge + alerts list)  
+  - Platform detail view  
+- Bootstrap frontend app (Next.js + styling library) with placeholder pages.
+
+***
+
+## Phase 1 – YouTube integration & basic dashboard (Week 1–3)
+
+### Dev A – Backend: YouTube data & APIs
+
+1. **YouTube OAuth**
+   - Implement `/auth/youtube/connect` + callback.  
+   - Store refresh tokens encrypted.
+
+2. **YouTube fetch job**
+   - Worker job:  
+     - On connect → fetch last 90 days of daily metrics.  
+     - Daily cron → fetch yesterday’s metrics.  
+   - Insert into `posts` + `daily_metrics` (raw metrics).
+
+3. **Normalized metric service**
+   - Compute `views_per_video`, `impressions_per_video`, `ctr`, `watch_time_per_view` per day.  
+   - Expose via `/api/metrics/youtube/daily`.
+
+### Dev B – Frontend: onboarding + charts
+
+1. **Onboarding flow**
+   - Auth (email/password or Supabase/Auth0).  
+   - “Connect YouTube” button calling backend OAuth URL.  
+   - Connection status indicator.
+
+2. **Basic dashboard**
+   - Graphs for YouTube views/impressions & `views_per_video`.  
+   - Handle “no data yet” state.
+
+3. **Landing page**
+   - Simple marketing page explaining “Algorithm Crash Insurance” + early access form.
+
+***
+
+## Phase 2 – Baselines & anomaly detection (Week 3–5)
+
+### Dev A – Detection engine
+
+1. **Baseline calculation**
+   - Cron job computing 30‑day & 90‑day EMAs + rolling stddev per creator/metric.  
+   - Store in `metric_baselines` table.
+
+2. **Anomaly detection**
+   - Implement z‑score + multi‑day persistence logic.  
+   - Simple changepoint detection (14‑day vs previous 30‑day mean).  
+   - Rule Y1 for YouTube: create `alerts` when conditions met.
+
+3. **Alert API**
+   - `/api/alerts` list endpoint.  
+   - `/api/alerts/:id` detail endpoint with raw numbers.
+
+### Dev B – UX for anomalies
+
+1. **Alert UI**
+   - Display alerts list (type, date, severity).  
+   - Detail view with:
+     - Metric chart showing baseline vs actual.  
+     - Non‑AI explanation from payload.
+
+2. **Feedback controls**
+   - “Accurate / Not accurate” toggle → POST to `/api/alerts/:id/feedback`.
+
+3. **Refine UX**
+   - Loading states, empty states, error toasts.
+
+***
+
+## Phase 3 – IG & LinkedIn integrations (Week 5–8)
+
+### Dev A – Instagram backend
+
+1. **IG Graph OAuth**
+   - Auth flow for creator/business accounts.  
+   - Token storage.
+
+2. **IG ingestion jobs**
+   - Fetch last 90 days + daily metrics per media (reel/post/story).  
+   - Store in `posts` + `daily_metrics`.
+
+3. **IG normalization**
+   - Compute `reach_per_post` by type, `engagement_per_1k_impressions`, `followers_delta_per_day`.  
+   - Extend metrics API: `/api/metrics/instagram/daily`.
+
+### Dev B – LinkedIn backend
+
+1. **LinkedIn OAuth**
+   - App registration + auth scopes.  
+   - Connect LinkedIn pages/profiles.
+
+2. **LinkedIn ingestion jobs**
+   - Fetch last 90 days + daily metrics (impressions, clicks, reactions, followers).  
+   - Store in DB.
+
+3. **LinkedIn normalization**
+   - Compute `impressions_per_post`, `clicks_per_impression`, `followers_delta_per_day`.  
+   - API: `/api/metrics/linkedin/daily`.
+
+### Both – Frontend
+
+- Add IG + LinkedIn connection UIs.  
+- Add per‑platform tabs with basic charts using normalized metrics.
+
+Split: Dev B can lead, Dev A code‑review.
+
+***
+
+## Phase 4 – IG/LI anomalies, cohorts & risk scoring (Week 8–12)
+
+### Dev A – IG/LI rules & cohorts
+
+1. **Extend anomaly engine**
+   - Implement IG rules (IG1: reels distribution drop, IG2: discovery collapse).  
+   - Implement LI rules (LI1: visibility drop, LI2: outbound click suppression).  
+   - Reuse baseline logic.
+
+2. **Cohort system**
+   - Extend `creators` with niche, region, follower buckets.  
+   - Implement cohort selection function (N nearest peers).  
+   - Add cohort anomaly check and classification:
+     - `PLATFORM_EVENT` vs `CREATOR_CONTENT_ISSUE` on alerts.
+
+### Dev B – Risk engine & dashboards
+
+1. **Platform dependency scores**
+   - Implement scoring function (effective share per platform + concentration index).  
+   - Store in `risk_scores`.  
+   - API: `/api/risk/overview`.
+
+2. **Risk dashboard UI**
+   - Overall “Platform Risk Index” gauge.  
+   - Pie chart of audience/income share.  
+   - Per‑platform cards (Low/Med/High dependency).
+
+3. **Alert classification UI**
+   - Show badge on alert: “Platform‑level event” vs “Content issue”.  
+   - Show simple cohort text: “42% of similar creators saw a similar drop.”
+
+***
+
+## Phase 5 – Recommendation engine & AI layer (Week 12–16)
+
+### Dev A – Rule‑based recommendations & AI plumbing
+
+1. **Recommendation engine**
+   - Define rule sets mapping: `(alert_type, dependency_state, email_list_status) → plan JSON`.  
+   - Service to create `recommendations` when new `PLATFORM_EVENT` alert appears.
+
+2. **LLM integration**
+   - Service that, given metrics + alert + plan JSON + creator profile, calls LLM to generate:
+     - Explanation paragraph.  
+     - Post/email templates.  
+   - Store AI output in `recommendations.ai_payload`.
+
+3. **Notification service**
+   - Email notification on new PLATFORM_EVENT with explanation + top actions.
+
+### Dev B – Playbook UX + polish
+
+1. **Actions/Playbook UI**
+   - For each alert:
+     - Show AI explanation.  
+     - Render list of actions with deadlines and checkboxes.  
+     - Expandable AI‑generated copy snippets.
+
+2. **Settings & profile**
+   - UI to set niche, region, time budget, main monetization types.  
+   - These values are already used by rules & AI.
+
+3. **Final UX polish**
+   - Mobile‑friendly views.  
+   - Onboarding tour (“Connect → Sync → Get Risk Score → See Action Plan”).
+
+***
+
+## Ongoing: both of you
+
+- **Dev A** leans slightly backend/infra/algorithms, but still does some UI work.  
+- **Dev B** leans slightly frontend/product/UX, but owns full stack of some features (e.g., LinkedIn pipeline, risk scoring).
+
+You can also rotate:
+
+- For each phase, one person “owns” backend of a feature, the other owns frontend for that same feature.  
+- Next phase, swap ownership so both stay full‑stack and understand everything.
+
+If you want, I can turn this into a **GitHub project board layout** (columns + issue titles) that you can copy‑paste.
+

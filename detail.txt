@@ -1,0 +1,644 @@
+PRD – CrashGuard (Algorithm Crash Insurance)
+1. Product Overview
+1.1 Vision
+CrashGuard is a SaaS that protects creators from platform risk – especially sudden changes in algorithms and monetization – on major social platforms.
+
+v1 platforms: YouTube, Instagram, LinkedIn.
+
+CrashGuard:
+
+Detects abnormal drops in reach/engagement that look like algorithm or environment changes, not “you just posted bad content”.
+
+Quantifies how over‑dependent a creator is on each platform.
+
+Generates concrete diversification playbooks (social → email, cross‑posting, content mix) so the creator’s business survives platform swings.
+
+1.2 Problem
+Creators and expert solo‑founders build audiences on platforms they don’t control:
+
+A single algorithm update, policy change, or payout tweak can slash reach or revenue overnight.
+
+Most tools (Hootsuite, TubeBuddy, Beehiiv, etc.) are focused on posting, SEO, or email, but none take responsibility for “you are over‑dependent on X and algo risk just went up.”
+
+Creators know they should build email lists and diversify, but they:
+
+Don’t see risk quantified.
+
+React late, only after big drops.
+
+Don’t get concrete, data‑driven “do this for the next 30 days” plans.
+
+1.3 Product thesis
+Treat platforms as black boxes, monitor their outputs like SREs monitor latency, and act as an AI strategist that helps creators rebalance their “audience portfolio” before algorithms wreck their income.
+
+2. Users & Use‑Cases
+2.1 Target user (v1)
+Expert/B2B creator / “solo business”:
+
+Examples: educator, consultant, indie dev, cohort‑course creator, coach.
+
+Active on YouTube, Instagram, and LinkedIn.
+
+Monetizes through courses, coaching, SaaS, or info products.
+
+Has or wants an email list (Kit/ConvertKit, Beehiiv, Substack).
+
+2.2 Secondary user
+Creator managers or small agencies managing multiple creators.
+
+Small brands relying heavily on organic social reach.
+
+2.3 Key use‑cases
+Early warning
+
+“Tell me as soon as YouTube or Instagram starts suppressing my content abnormally.”
+
+Platform dependency view
+
+“Show me how much of my audience/income depends on each platform.”
+
+Actionable diversification plan
+
+“If IG crashes tomorrow, what exactly should I do for the next month to protect revenue?”
+
+3. Goals and Non‑Goals
+3.1 Goals (v1)
+Detect & alert on anomalous drops in reach/engagement on YouTube, IG, LinkedIn that are likely platform/environment changes.
+
+Compute a platform dependency score and overall platform risk index for each creator.
+
+Generate 2–5 concrete diversification actions per alert, especially:
+
+Social → email list growth
+
+Cross‑posting to healthier platforms
+
+Content mix adjustments
+
+Support at least one major email provider integration (Kit/ConvertKit or Beehiiv).
+
+3.2 Non‑Goals (v1)
+No full scheduler (Buffer/Hootsuite replacement).
+
+No thumbnail/SEO optimizer (TubeBuddy/vidIQ replacement).
+
+No full email service provider (ESP) or CRM.
+
+4. System Architecture & Tech Stack
+4.1 High‑level architecture
+Frontend
+
+React or Next.js (TS) SPA/SSR – dashboard, onboarding, settings.
+
+Backend API
+
+FastAPI (Python) or NestJS (TypeScript).
+
+REST/JSON API consumed by frontend.
+
+Worker service
+
+Background jobs for:
+
+Metric ingestion.
+
+Baseline & anomaly computation.
+
+Risk scoring.
+
+Generating recommendations & notifications.
+
+Database
+
+Postgres (Supabase/Neon/Railway) as main DB.
+
+Time‑series data stored in normalized tables or as JSON in daily_metrics rows.
+
+Queue & scheduling
+
+Redis + RQ/Celery (Python) or BullMQ (Node).
+
+Cron‑like jobs (via hosted scheduler or worker) for daily ingestion & analytics.
+
+External integrations
+
+YouTube Analytics & Data APIs.
+
+Instagram Graph API (Meta).
+
+LinkedIn Marketing/Analytics API.
+
+Email provider API (Kit/Beehiiv) – later in v1.
+
+LLM provider (OpenAI / Anthropic) for explanations & copy.
+
+5. Data Model & Metrics
+5.1 Core entities
+users – auth accounts.
+
+creators – creator profiles (niche, region, time_budget, business model).
+
+platform_connections – OAuth tokens + metadata per platform.
+
+email_connections – ESP integrations.
+
+posts – per‑platform content items (id, platform, type, published_at, etc.).
+
+daily_metrics – per creator, per platform, per date; metrics stored in structured columns and/or JSON.
+
+alerts – anomaly & risk alerts (type, severity, payload).
+
+recommendations – actions tied to alerts.
+
+5.2 Metrics by platform (normalized)
+YouTube (YouTube Analytics API).
+
+Raw: views, impressions, avg view duration, watch time, subs gained, revenue (estimated).
+
+Derived per day:
+
+views_per_video
+
+impressions_per_video
+
+ctr = views / impressions
+
+watch_time_per_view
+
+subs_per_1k_views
+
+Split metrics by format (Shorts vs long‑form).
+
+Instagram (Instagram Graph API).
+
+Raw: reach, impressions, likes, comments, saves, shares, profile visits, website taps, followers.
+
+Derived per day & content type (reel/post/story):
+
+reach_per_post
+
+engagement_per_1k_impressions
+
+followers_delta_per_day
+
+LinkedIn (Creator/Page analytics)
+
+Raw: impressions, clicks, reactions, comments, shares, followers.
+
+Derived:
+
+impressions_per_post
+
+clicks_per_impression
+
+followers_delta_per_day
+
+We also track posting frequency and content mix (e.g., posts/week, ratio of Shorts:long, reels:carousels) to adjust baselines.
+
+6. Anomaly Detection & Classification (Production‑Style)
+This is the “how do you detect anomalies?” piece your CTO asked.
+
+6.1 Step 1 – Normalize metrics
+For each creator & platform, convert raw counts into normalized metrics:
+
+Adjust for posting frequency and follower count.
+
+Example metrics:
+
+YouTube:
+
+views_per_video, impressions_per_video, ctr, watch_time_per_view.
+
+Instagram:
+
+reach_per_post (per reel/feed/story), engagement_per_1k_impressions, followers_delta_per_day.
+
+LinkedIn:
+
+impressions_per_post, clicks_per_impression, followers_delta_per_day.
+
+This ensures we are not confusing “you posted less” or “you grew 5x in followers” with algorithm changes.
+
+6.2 Step 2 – Rolling baselines
+For each normalized metric 
+m
+m:
+
+Maintain 30‑day exponential moving average (EMA) → short‑term expectation.
+
+Maintain 90‑day EMA → long‑term context.
+
+Also maintain a rolling standard deviation (or robust variance):
+
+Use EMA of squared deviations or median absolute deviation (MAD).
+
+Put a floor on standard deviation to avoid wild z‑scores when variance is very low.
+
+Intuition:
+
+“For the last month, when this creator posted about 3 reels/week, they usually got 20k reach per reel ± 6k.”
+
+6.3 Step 3 – Candidate anomaly detection
+On each new day (or hour, if we later go that granular):
+
+Compute z‑score vs 30‑day EMA:
+z
+=
+(
+m
+today
+−
+μ
+30
+)
+/
+σ
+30
+z=(m 
+today
+​
+ −μ 
+30
+​
+ )/σ 
+30
+​
+ 
+
+Flag a candidate anomaly when:
+
+z
+≤
+−
+2
+z≤−2 (or tuned per metric), and
+
+This persists for ≥ N_days (e.g. 3–7 days), not just a single bad day.
+
+Also use simple changepoint detection:
+
+Compare mean of last 14 days vs previous 30.
+
+If the new mean is lower by > threshold (e.g. 30–40%) and change is statistically significant, mark as a regime shift.
+
+The logic is: sustained deviation from your own normal, not random noise.
+
+6.4 Step 4 – “Algo vs you” classification
+After we detect a change, we classify it based on which metrics moved.
+
+Case 1 – Distribution/algorithm issue
+
+Quality metrics OK:
+
+CTR around baseline
+
+Watch time/avg view duration around baseline
+
+Distribution metrics tank:
+
+impressions_per_video or reach_per_post down strongly
+→ Platform is showing your content to fewer people even though those who see it behave the same. Strong signal of algorithm/distribution change.
+
+Case 2 – Content issue
+
+Impressions/reach stable
+
+CTR and watch time drop
+→ Hooks/content/thumbnail likely weaker. We label this as CREATOR_CONTENT_ISSUE, not algorithm.
+
+Case 3 – Monetization issue
+
+Views stable
+
+RPM or revenue per 1k views collapses
+→ Payout change or ad market issue, not reach.
+
+We encode these logical patterns as simple rules per platform.
+
+6.5 Step 5 – Peer cohort comparison
+To avoid over‑flagging “algo”:
+
+Build cohorts per platform:
+
+same follower band (e.g., 10–50k, 50–250k),
+
+same region,
+
+similar niche tags.
+
+For a given candidate anomaly on a creator:
+
+“How many peers show a similar metric drop (magnitude + direction) in the same 1–2 week window?”
+
+If ≥ 30–50% of peers show similar drop → classify as PLATFORM_EVENT (likely algo/env change).
+
+If not → keep as creator‑specific issue.
+
+This peer confirmation step is what upgrades “weird metrics” to a “probable algorithm/environment change.”
+
+6.6 Final label and hand‑off
+Each anomaly becomes:
+
+PLATFORM_EVENT or CREATOR_CONTENT_ISSUE, with metadata:
+
+platform, metric, severity, supporting evidence (z‑scores, cohort stats).
+
+This feeds into the risk engine and recommendation engine.
+
+7. Platform‑Specific Rules (YouTube, Instagram, LinkedIn)
+These rules sit on top of the generic detection logic.
+
+7.1 YouTube
+Derived metrics: views_per_video, impressions_per_video, ctr, watch_time_per_view, subs_per_1k_views, split by Shorts vs long‑form.
+
+Rule Y1 – Distribution drop
+
+CTR & watch time per view ~ baseline.
+
+impressions_per_video z‑score ≤ −2 for ≥ 7 days.
+
+Changepoint: new 14‑day mean impressions < 0.6 × old mean.
+
+Peer cohort: ≥ 40% show similar pattern.
+
+→ Label YOUTUBE_DISTRIBUTION_DROP → PLATFORM_EVENT.
+
+Rule Y2 – Shorts vs long shift
+
+Shorts impressions ↑ significantly while long‑form ↓ (or vice‑versa), with posting mix unchanged.
+→ Format preference shift → suggestions about content mix.
+
+7.2 Instagram
+Using Instagram Graph API metrics per content type.
+
+Rule IG1 – Reel distribution drop
+
+Saves per impression and completion rate for reels ~ baseline.
+
+reach_per_reel down > 40% vs baseline for 7–10 days.
+
+Carousels/feed posts stay around normal.
+
+Cohort: many peers see same.
+
+→ INSTAGRAM_REELS_DISTRIBUTION_DROP → PLATFORM_EVENT.
+
+Rule IG2 – Discovery collapse
+
+Engagement per follower stable.
+
+New follower growth followers_delta_per_day < baseline − 2σ for 14+ days.
+→ Explore/Reels discovery changed.
+
+7.3 LinkedIn
+Rule LI1 – Visibility drop
+
+Reactions/comments per impression stable.
+
+impressions_per_post down > 40% vs baseline for ≥ 10 days.
+
+Rule LI2 – Outbound click suppression
+
+Reactions stable, but clicks_per_impression drops sharply across posts with external links.
+→ Suggests algo change in how much LinkedIn surfaces outbound links.
+
+8. Risk Engine – Platform Dependency Scores
+We compute how concentrated a creator’s audience/income is.
+
+8.1 Inputs
+Audience distribution: followers/subs per platform + email list size.
+
+Traffic distribution: share of website/product traffic per platform (if connected).
+
+Revenue distribution (optional/self‑reported): rough percentage per platform or monetization channel.
+
+8.2 Simple scoring v1
+For each platform 
+P
+P:
+
+Effective share 
+S
+P
+=
+0.4
+×
+a
+u
+d
+i
+e
+n
+c
+e
+s
+h
+a
+r
+e
++
+0.3
+×
+t
+r
+a
+f
+f
+i
+c
+s
+h
+a
+r
+e
++
+0.3
+×
+r
+e
+v
+e
+n
+u
+e
+s
+h
+a
+r
+e
+S 
+P
+​
+ =0.4×audience 
+s
+​
+ hare+0.3×traffic 
+s
+​
+ hare+0.3×revenue 
+s
+​
+ hare.
+
+Compute:
+
+Concentration index (e.g., sum of 
+S
+P
+2
+S 
+P
+2
+​
+ ) → higher = more platform risk.
+
+Label each platform’s dependency level (Low/Med/High) based on share.
+
+This feeds into alerts (e.g., “YouTube dependency HIGH: 72% of your effective audience/income”).
+
+9. Recommendation Engine (Rules + AI)
+9.1 Rule‑based core (non‑AI)
+Rules use:
+
+Alert type (YOUTUBE_DISTRIBUTION_DROP, INSTAGRAM_DISCOVERY_DOWNGRADE, etc.).
+
+Dependency levels (YouTube/IG/LinkedIn/email).
+
+Creator constraints (time budget, products, existing email list).
+
+Example rule:
+
+If alert = YOUTUBE_DISTRIBUTION_DROP and yt_dependency = HIGH and email_list_small →
+
+Recommend 30‑day plan with:
+
+More explicit email CTAs on YouTube.
+
+2–3 lead‑magnet videos.
+
+Cross‑posting to LinkedIn feeds, etc.
+
+Output: structured actions with tags like build_email, cross_post, shift_content_mix.
+
+9.2 Where AI (LLMs) step in
+AI usage v1:
+
+Explainer & coach
+
+Convert raw alert payloads into plain‑English explanations like:
+
+“Your YouTube impressions per video are down 43% vs the last 30 days, but CTR and watch time are stable. 46% of similar channels saw a similar drop last week, so this looks like a distribution change, not a content problem.”
+
+Summarise recommended plan (“For the next 3 weeks, use YouTube mainly to push lead magnets, and shift deep‑dive content to LinkedIn + email.”).
+
+Playbooks & copy templates
+
+Given actions + creator niche, generate:
+
+Social post ideas per platform.
+
+Lead magnet ideas.
+
+Email subject lines and body samples.
+
+Simple funnel sequences (“YT Short → email signup → webinar”).
+
+So AI here is “growth strategist + copywriter”, grounded in the metrics and rules. The detection & classification logic itself is deterministic, not black‑box.
+
+9.3 Future ML enhancements (post‑v1)
+Later, add more ML:
+
+Smarter anomaly detection: per‑platform forecasting models (Prophet, GBMs) and residual analysis.
+
+Automated cohort discovery: embeddings + clustering to build better peer groups than manual bands.
+
+Alert prioritisation: small model that learns which alerts drive user actions and tunes sensitivity per creator.
+
+10. Data Sources & “Real‑Time” Considerations
+10.1 Official APIs (main signal)
+YouTube Analytics/Data APIs – views, impressions, CTR, watch time, subs, revenue metrics.
+
+Instagram Graph API – reach, impressions, engagement, profile clicks, follower stats.
+
+LinkedIn Analytics/Marketing APIs – impressions, clicks, reactions, follower stats.
+
+All are free up to reasonable quotas; daily per‑creator polling + 90‑day backfill is well within quota for early‑stage scale.
+
+No need for true second‑by‑second realtime; daily resolution is enough for risk detection.
+
+10.2 Secondary signals (optional, later)
+Official changelogs & blogs – YouTube Creator Insider, Meta/Instagram Newsroom, LinkedIn blog, creator‑economy newsletters.
+
+Simple crawler that records “known platform events” and overlays them on charts.
+
+Global panel / platform health – As userbase grows, median metrics across all creators per platform become a “platform index”.
+
+Social chatter – optionally surface trending “IG killed my reach” topics, but as UI context only.
+
+11. Frontend UX – Key Screens
+Dashboard (Overview)
+
+Overall “Platform Risk Index” gauge (0–100).
+
+Pie chart of effective audience/income per platform.
+
+Latest alerts (with AI explanations) and top actions.
+
+Platforms tab
+
+Per‑platform cards: YouTube, Instagram, LinkedIn.
+
+For each: risk level, trend charts (normalized metrics), anomalies visualised, cohort comparison.
+
+Actions / Playbook tab
+
+30‑day plan with tasks (checkboxes).
+
+For each task: AI‑generated copy templates and examples.
+
+Connections & Settings
+
+Connect/disconnect platforms.
+
+Set niche/region/time budget.
+
+Notification preferences.
+
+12. Implementation Roadmap (High‑Level)
+Phase 1 (2–3 weeks) – Skeleton & YouTube backfill
+
+Set up backend, DB, auth, minimal frontend.
+
+Implement YouTube OAuth and pull last 90 days of metrics.
+
+Store in posts & daily_metrics.
+
+Phase 2 (3–4 weeks) – YouTube baselines + anomaly detection + basic alerts
+
+Implement normalized metrics, EMAs, z‑score anomalies, simple Y1 rule.
+
+Store alerts & show a basic dashboard.
+
+Phase 3 (3–4 weeks) – Instagram & LinkedIn integration
+
+Add IG Graph + LinkedIn APIs.
+
+Implement IG/LI normalized metrics & rules.
+
+Extend UI with platform tabs.
+
+Phase 4 (4–6 weeks) – Cohorts + risk scores + rule‑based actions
+
+Implement cohort logic & classification between PLATFORM_EVENT vs CREATOR_CONTENT_ISSUE.
+
+Implement platform dependency scores and first risk index.
+
+Build Actions tab with rule‑based plans.
+
+Phase 5 (2–4 weeks) – AI explainer + copy templates
+
+Integrate LLM.
+
+Generate explanations for alerts and sample posts/emails.
+
+Polish UX, onboarding, and public landing page.

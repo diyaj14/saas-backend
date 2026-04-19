@@ -1,0 +1,71 @@
+Short version:  
+Most of the **detection** is classic stats/time‑series (not LLMs), and most of the **“AI”** is in (1) turning raw data into explanations and (2) generating growth playbooks and copy from your metrics.
+
+You can pitch it as: *“analytics + ML under the hood, with an AI strategist on top.”*
+
+***
+
+## 1. Where we’re NOT using AI (on purpose)
+
+The core signal “something weird is happening” comes from:
+
+- Rolling baselines (EMAs)  
+- Z‑scores / changepoint detection  
+- Peer cohort comparison  
+
+This is standard, deterministic time‑series analysis. It’s more reliable and explainable than asking an LLM “did the algorithm change?”.
+
+So: anomaly detection logic = **statistics**, not “black‑box AI”. That’s good for trust and reproducibility.
+
+***
+
+## 2. Where we ARE using AI in v1
+
+### 2.1 AI as an explainer & coach
+
+Once the stats detect and classify an event (e.g. `YOUTUBE_DISTRIBUTION_DROP`), we use an LLM to:
+
+- Turn raw metrics into **plain‑English explanations**:
+
+  > “Your YouTube impressions per video are down 43% vs your last 30 days, but CTR and watch time are stable. 46% of similar channels saw a similar drop last week, so this looks like a distribution change, not a content problem.”
+
+- Generate a short **action summary** tailored to the creator:
+
+  > “For the next 3 weeks, use YouTube mainly to push lead magnets, and shift deep‑dive content to LinkedIn + email.”
+
+This is a perfect LLM job: lots of numbers → natural‑language, context‑aware explanation.
+
+### 2.2 AI to generate diversification playbooks & content templates
+
+We have a rule‑based engine that decides *what* kinds of actions to recommend (e.g., “grow email list”, “cross‑post to LinkedIn”, “rebalance IG vs YT”).  
+Then we call an LLM to generate **specific, usable assets**:
+
+- Social post ideas adapted to the creator’s niche and platform.  
+- Lead magnet ideas.  
+- Email subject lines and body templates.  
+- Simple funnel copy (“YT Short → email signup → webinar”).
+
+So AI here = **“growth strategist + copywriter”**, grounded in the creator’s actual metrics and risk level.
+
+***
+
+## 3. Optional / later: more “ML‑ish” AI
+
+After v1, you can add narrower ML/AI in a few more places:
+
+1. **Smarter anomaly detection:**  
+   - Instead of simple z‑scores, train models (e.g., Prophet, gradient boosting) per platform to forecast expected metrics and flag residuals.
+
+2. **Cohort discovery / clustering:**  
+   - Use embeddings + clustering on creator metadata and performance patterns to automatically find better peer groups than manual bands.
+
+3. **Routing & prioritising alerts:**  
+   - Small model that learns which creators actually act on which alerts and tunes sensitivity per user.
+
+All of these are “classic ML” rather than generative AI, but they make the engine smarter over time.
+
+***
+
+## 4. One‑sentence answer for your CTO
+
+> “We use deterministic stats to detect and classify anomalies, and we use AI (LLMs) on top to explain what’s happening and generate concrete diversification playbooks and content templates tailored to each creator. Later we can add ML models for smarter forecasting and cohorting, but the core v1 is stats + LLM ‘coach,’ not magic black‑box detection.”
